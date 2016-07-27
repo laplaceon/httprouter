@@ -443,6 +443,141 @@ walk: // outer loop for walking the tree
 	}
 }
 
+func (n *node) getPath(path string) (matchedPath string, p Params, tsr bool) {
+var handle Handle = nil
+matchedPath = "/"
+walk: // outer loop for walking the tree
+	for {
+		if len(path) > len(n.path) {
+			if path[:len(n.path)] == n.path {
+				path = path[len(n.path):]
+				// If this node does not have a wildcard (param or catchAll)
+				// child,  we can just look up the next child node and continue
+				// to walk down the tree
+				if !n.wildChild {
+					c := path[0]
+					for i := 0; i < len(n.indices); i++ {
+						if c == n.indices[i] {
+							n = n.children[i]
+							matchedPath += n.path
+							continue walk
+						}
+					}
+
+					// Nothing found.
+					// We can recommend to redirect to the same URL without a
+					// trailing slash if a leaf exists for that path.
+					tsr = (path == "/" && n.handle != nil)
+
+					matchedPath = ""
+					return
+
+				}
+
+				// handle wildcard child
+				n = n.children[0]
+				switch n.nType {
+				case param:
+					// find param end (either '/' or path end)
+					end := 0
+					for end < len(path) && path[end] != '/' {
+						end++
+					}
+
+					// save param value
+					if p == nil {
+						// lazy allocation
+						p = make(Params, 0, n.maxParams)
+					}
+					i := len(p)
+					p = p[:i+1] // expand slice within preallocated capacity
+					p[i].Key = n.path[1:]
+					matchedPath += ":" + p[i].Key
+					p[i].Value = path[:end]
+
+					// we need to go deeper!
+					if end < len(path) {
+						if len(n.children) > 0 {
+							path = path[end:]
+							n = n.children[0]
+							matchedPath += n.path
+							continue walk
+						}
+
+						// ... but we can't
+						tsr = (len(path) == end+1)
+						matchedPath = ""
+						return
+					}
+
+					if handle = n.handle; handle != nil {
+						return
+					} else if len(n.children) == 1 {
+						// No handle found. Check if a handle for this path + a
+						// trailing slash exists for TSR recommendation
+						n = n.children[0]
+						tsr = (n.path == "/" && n.handle != nil)
+						matchedPath = ""
+					}
+
+					return
+
+				case catchAll:
+					// save param value
+					if p == nil {
+						// lazy allocation
+						p = make(Params, 0, n.maxParams)
+					}
+					i := len(p)
+					p = p[:i+1] // expand slice within preallocated capacity
+					p[i].Key = n.path[2:]
+					p[i].Value = path
+
+					handle = n.handle
+					return
+
+				default:
+					panic("invalid node type")
+				}
+			}
+		} else if path == n.path {
+			// We should have reached the node containing the handle.
+			// Check if this node has a handle registered.
+			if handle = n.handle; handle != nil {
+				matchedPath += n.path
+				return
+			}
+
+			if path == "/" && n.wildChild && n.nType != root {
+				tsr = true
+				return
+			}
+
+			// No handle found. Check if a handle for this path + a
+			// trailing slash exists for trailing slash recommendation
+			for i := 0; i < len(n.indices); i++ {
+				if n.indices[i] == '/' {
+					n = n.children[i]
+					tsr = (len(n.path) == 1 && n.handle != nil) ||
+						(n.nType == catchAll && n.children[0].handle != nil)
+					matchedPath = ""
+					return
+				}
+			}
+
+			return
+		}
+
+		// Nothing found. We can recommend to redirect to the same URL with an
+		// extra trailing slash if a leaf exists for that path
+		tsr = (path == "/") ||
+			(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&
+				path == n.path[:len(n.path)-1] && n.handle != nil)
+		matchedPath = ""
+		return
+	}
+}
+
 // Makes a case-insensitive lookup of the given path and tries to find a handler.
 // It can optionally also fix trailing slashes.
 // It returns the case-corrected path and a bool indicating whether the lookup

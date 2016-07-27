@@ -293,6 +293,20 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {
 	return nil, nil, false
 }
 
+// LookupPath retrieves the pattern associated with a path
+// This is useful in using the pattern to identify routes as opposed to using named routes
+func (r *Router) LookupPath(method, path string) (string, Params, bool) {
+	if root := r.trees[method]; root != nil {
+		matchedPath, params, tsr := root.getPath(path)
+		if(tsr) {
+			return root.getPath(path[:len(path)-1])
+		}
+		return matchedPath, params, tsr
+	}
+	
+	return "", nil, false
+}
+
 func (r *Router) allowed(path, reqMethod string) (allow string) {
 	if path == "*" { // server-wide
 		for method := range r.trees {

@@ -412,6 +412,7 @@ walk: // outer loop for walking the tree
 			// We should have reached the node containing the handle.
 			// Check if this node has a handle registered.
 			if handle = n.handle; handle != nil {
+				// fmt.Printf("%v asd\n", n)
 				return
 			}
 
@@ -445,7 +446,7 @@ walk: // outer loop for walking the tree
 
 func (n *node) getPath(path string) (matchedPath string, p Params, tsr bool) {
 var handle Handle = nil
-matchedPath = "/"
+// matchedPath = "/"
 walk: // outer loop for walking the tree
 	for {
 		if len(path) > len(n.path) {
@@ -454,12 +455,13 @@ walk: // outer loop for walking the tree
 				// If this node does not have a wildcard (param or catchAll)
 				// child,  we can just look up the next child node and continue
 				// to walk down the tree
+				matchedPath += n.path
 				if !n.wildChild {
 					c := path[0]
 					for i := 0; i < len(n.indices); i++ {
 						if c == n.indices[i] {
 							n = n.children[i]
-							matchedPath += n.path
+							// matchedPath += n.path
 							continue walk
 						}
 					}
@@ -468,7 +470,6 @@ walk: // outer loop for walking the tree
 					// We can recommend to redirect to the same URL without a
 					// trailing slash if a leaf exists for that path.
 					tsr = (path == "/" && n.handle != nil)
-
 					matchedPath = ""
 					return
 
@@ -500,7 +501,7 @@ walk: // outer loop for walking the tree
 						if len(n.children) > 0 {
 							path = path[end:]
 							n = n.children[0]
-							matchedPath += n.path
+							// matchedPath += n.path
 							continue walk
 						}
 
@@ -550,6 +551,8 @@ walk: // outer loop for walking the tree
 
 			if path == "/" && n.wildChild && n.nType != root {
 				tsr = true
+				// Don't reset matchedPath here, there's no point
+				// Investigate into skipping this statement and starting loop again
 				return
 			}
 
@@ -567,7 +570,7 @@ walk: // outer loop for walking the tree
 
 			return
 		}
-
+		
 		// Nothing found. We can recommend to redirect to the same URL with an
 		// extra trailing slash if a leaf exists for that path
 		tsr = (path == "/") ||

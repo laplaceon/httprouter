@@ -38,6 +38,69 @@ type testRequests []struct {
 	ps         Params
 }
 
+func TestApiLookup(t *testing.T) {
+	tree := &node{}
+
+	routes := [...]string{
+		"/",
+		"/cmd/:tool/:sub",
+		"/cmd/:tool/",
+		"/src/*filepath",
+		"/search/",
+		"/search/:query",
+		"/user_:name",
+		"/user_:name/about",
+		"/files/:dir/*filepath",
+		"/doc/",
+		"/doc/go_faq.html",
+		"/doc/go1.html",
+		"/info/:user/public",
+		"/info/:user/project/:project",
+	}
+	for _, route := range routes {
+		tree.addRoute(route, fakeHandler(route))
+	}
+
+	printChildren(tree, "")
+
+	checkApiRequests(t, tree, testRequests{
+		{"/", false, "/", nil},
+		{"/cmd/test/", false, "/cmd/:tool/", Params{Param{"tool", "test"}}},
+		{"/cmd/test", true, "", Params{Param{"tool", "test"}}},
+		{"/cmd/test/3", false, "/cmd/:tool/:sub", Params{Param{"tool", "test"}, Param{"sub", "3"}}},
+		{"/src/", false, "/src/*filepath", Params{Param{"filepath", "/"}}},
+		{"/src/some/file.png", false, "/src/*filepath", Params{Param{"filepath", "/some/file.png"}}},
+		{"/search/", false, "/search/", nil},
+		{"/search/someth!ng+in+ünìcodé", false, "/search/:query", Params{Param{"query", "someth!ng+in+ünìcodé"}}},
+		{"/search/someth!ng+in+ünìcodé/", true, "", Params{Param{"query", "someth!ng+in+ünìcodé"}}},
+		{"/user_gopher", false, "/user_:name", Params{Param{"name", "gopher"}}},
+		{"/user_gopher/about", false, "/user_:name/about", Params{Param{"name", "gopher"}}},
+		{"/files/js/inc/framework.js", false, "/files/:dir/*filepath", Params{Param{"dir", "js"}, Param{"filepath", "/inc/framework.js"}}},
+		{"/info/gordon/public", false, "/info/:user/public", Params{Param{"user", "gordon"}}},
+		{"/info/gordon/project/go", false, "/info/:user/project/:project", Params{Param{"user", "gordon"}, Param{"project", "go"}}},
+	})
+
+	// checkPriorities(t, tree)
+	// checkMaxParams(t, tree)
+}
+
+func checkApiRequests(t *testing.T, tree *node, requests testRequests) {
+	for _, request := range requests {
+		route, _, tsr := tree.getPath(request.path)
+		if tsr {
+			// path := request.path
+			// route, _, _ := tree.getPath(path[:len(path)-1])
+			// if route != request.route {
+				// t.Errorf("invalid path returned: %s for %v", route, request)
+			// }
+		} else {
+			if route != request.route {
+				t.Errorf("invalid path returned: %s for %s", route, request.route)
+			}
+		}
+	}
+}
+
 func checkRequests(t *testing.T, tree *node, requests testRequests) {
 	for _, request := range requests {
 		handler, ps, _ := tree.getValue(request.path)

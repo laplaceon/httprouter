@@ -296,6 +296,7 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {
 // LookupPath retrieves the pattern associated with a path
 // This is useful in using the pattern to identify routes as opposed to using named routes
 func (r *Router) LookupPath(method, path string) (string, Params, bool) {
+	// handle, params, _ := r.Lookup(method, path)
 	if root := r.trees[method]; root != nil {
 		matchedPath, params, tsr := root.getPath(path)
 		if(tsr) {
